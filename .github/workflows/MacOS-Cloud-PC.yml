@@ -1,38 +1,14 @@
-name: MacOS Cloud VNC
+- name: Enable VNC (Password Only – Secure)
+  run: |
+    sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+      -activate -configure -access -on \
+      -privs -all \
+      -restart -agent -menu
 
-on:
-  workflow_dispatch:
+    # Enable VNC password authentication
+    sudo defaults write /Library/Preferences/com.apple.VNCSettings AuthMethod -int 1
 
-jobs:
-  macos-vnc:
-    name: macOS VNC Cloud PC
-    runs-on: macos-latest
-
-    steps:
-      - name: Enable Screen Sharing (VNC)
-        run: |
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-          -activate -configure -access -on \
-          -users runner \
-          -privs -all \
-          -restart -agent -menu
-
-          sudo defaults write /Library/Preferences/com.apple.VNCSettings AuthMethod -int 1
-
-      - name: Set VNC Password
-        run: |
-          echo "vncpassword" | perl -we 'print pack("H*", unpack("H*", <>))' | sudo tee /Library/Preferences/com.apple.VNCSettings >/dev/null
-
-      - name: Install Ngrok
-        run: |
-          brew install ngrok
-
-      - name: Start Ngrok TCP VNC Tunnel
-        env:
-          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-        run: |
-          ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
-          ngrok tcp 5900 &
-
-      - name: Keep Mac Alive
+- name: Set VNC Password
+  run: |
+    echo "irvyrvck" | perl -we 'print pack("H*", unpack("H*", <>))' | sudo tee /Library/Preferences/com.apple.VNCSettings >/dev/null      - name: Keep Mac Alive
         uses: mxschmitt/action-tmate@v2
