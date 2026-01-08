@@ -4,52 +4,55 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest  # This is the Windows Server 2022/Windows 11 environment
+    runs-on: windows-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install NVIDIA CUDA Toolkit
+      - name: Install NVIDIA CUDA & Drivers
         run: |
-          # Downloads and installs the CUDA toolkit via Chocolatey
           choco install cuda -y
-
-      - name: Install Ngrok
-        run: |
-          choco install ngrok -y
+          choco install nvidia-display-driver -y
 
       - name: Setup Remote Desktop (RDP)
         run: |
-          # Enable RDP on Windows
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
 
-      - name: Create User Account
+      - name: Configure Custom User
         run: |
-          # Creates a user: runneradmin / Password: Password123!
-          net user runneradmin Password123! /add
-          net localgroup administrators runneradmin /add
+          $user = "irvyrvckadmin"
+          $pass = "irvyrvck"
+          # Check if user exists to avoid "Account already exists" error
+          if (Get-LocalUser -Name $user -ErrorAction SilentlyContinue) {
+              net user $user $pass
+              Write-Host "User $user already exists. Password updated."
+          } else {
+              net user $user $pass /add
+              net localgroup administrators $user /add
+              Write-Host "User $user created successfully."
+          }
 
-      - name: Start Ngrok Tunnel
+      - name: Install and Start Ngrok
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
+          choco install ngrok -y
           ngrok config add-authtoken "$env:NGROK_AUTH_TOKEN"
-          # RDP uses port 3389
           Start-Process ngrok -ArgumentList "tcp 3389"
-          Start-Sleep -Seconds 10
+          Start-Sleep -Seconds 15
 
-      - name: Get RDP Address
+      - name: Reveal RDP Address
         run: |
-          # Fetches the public URL from Ngrok's local API
           $tunnels = Invoke-RestMethod http://localhost:4040/api/tunnels
           $public_url = $tunnels.tunnels[0].public_url
-          Write-Host "Connect to RDP at: $public_url"
+          Write-Host "--- CONNECTION DETAILS ---"
+          Write-Host "Address: $public_url"
+          Write-Host "Username: irvyrvckadmin"
+          Write-Host "Password: irvyrvck"
 
       - name: Keep Alive
         run: |
-          # Keeps the runner active for 6 hours or until manual stop
-          $loop = $true
-          while($loop) { Start-Sleep -Seconds 60 }
+          while($true) { Start-Sleep -Seconds 60 }
           
