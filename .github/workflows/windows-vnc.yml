@@ -1,0 +1,55 @@
+name: Windows 11 NVIDIA Environment
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest  # This is the Windows Server 2022/Windows 11 environment
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install NVIDIA CUDA Toolkit
+        run: |
+          # Downloads and installs the CUDA toolkit via Chocolatey
+          choco install cuda -y
+
+      - name: Install Ngrok
+        run: |
+          choco install ngrok -y
+
+      - name: Setup Remote Desktop (RDP)
+        run: |
+          # Enable RDP on Windows
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+
+      - name: Create User Account
+        run: |
+          # Creates a user: runneradmin / Password: Password123!
+          net user runneradmin Password123! /add
+          net localgroup administrators runneradmin /add
+
+      - name: Start Ngrok Tunnel
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: |
+          ngrok config add-authtoken "$env:NGROK_AUTH_TOKEN"
+          # RDP uses port 3389
+          Start-Process ngrok -ArgumentList "tcp 3389"
+          Start-Sleep -Seconds 10
+
+      - name: Get RDP Address
+        run: |
+          # Fetches the public URL from Ngrok's local API
+          $tunnels = Invoke-RestMethod http://localhost:4040/api/tunnels
+          $public_url = $tunnels.tunnels[0].public_url
+          Write-Host "Connect to RDP at: $public_url"
+
+      - name: Keep Alive
+        run: |
+          # Keeps the runner active for 6 hours or until manual stop
+          $loop = $true
+          while($loop) { Start-Sleep -Seconds 60 }
+          
