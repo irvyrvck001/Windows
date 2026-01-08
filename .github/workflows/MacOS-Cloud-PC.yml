@@ -8,18 +8,21 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Enable Screen Sharing (VNC)
         run: |
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -privs -all \
             -restart -agent -menu
-
           # Enable VNC password authentication ONLY
           sudo defaults write /Library/Preferences/com.apple.VNCSettings AuthMethod -int 1
 
       - name: Set VNC Password
         run: |
+          # Sets the VNC password to 'irvyrvck'
           echo "irvyrvck" | perl -we 'print pack("H*", unpack("H*", <>))' | sudo tee /Library/Preferences/com.apple.VNCSettings >/dev/null
 
       - name: Install Ngrok
@@ -32,7 +35,8 @@ jobs:
         run: |
           ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
           ngrok tcp 5900 --log=stdout &
-          sleep 5
+          sleep 10
 
-      - name: Keep Mac Alive
+      - name: Keep Mac Alive (Tmate)
         uses: mxschmitt/action-tmate@v2
+        
