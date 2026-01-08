@@ -1,42 +1,43 @@
 name: macOS VNC Cloud PC
-
 on:
   workflow_dispatch:
 
 jobs:
   macos-vnc:
     runs-on: macos-latest
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Enable Screen Sharing (VNC)
+      - name: Create VNC User
         run: |
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -activate -configure -access -on \
-            -privs -all \
-            -restart -agent -menu
-          # Enable VNC password authentication ONLY
-          sudo defaults write /Library/Preferences/com.apple.VNCSettings AuthMethod -int 1
+          # Create a user named 'runner' with password '1234'
+          sudo dscl . -create /Users/runneruser
+          sudo dscl . -create /Users/runneruser UserShell /bin/bash
+          sudo dscl . -create /Users/runneruser RealName "Runner User"
+          sudo dscl . -create /Users/runneruser UniqueID 501
+          sudo dscl . -create /Users/runneruser PrimaryGroupID 20
+          sudo dscl . -create /Users/runneruser NFSHomeDirectory /Users/runneruser
+          sudo dscl . -passwd /Users/runneruser 1234
+          sudo dscl . -append /Groups/admin GroupMembership runneruser
 
-      - name: Set VNC Password
+      - name: Force Enable VNC
         run: |
-          # Sets the VNC password to 'irvyrvck'
-          echo "irvyrvck" | perl -we 'print pack("H*", unpack("H*", <>))' | sudo tee /Library/Preferences/com.apple.VNCSettings >/dev/null
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -allowAccessFor -allUsers -privs -all
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -clientopts -setvnclegacy -vnclegacy yes
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -clientopts -setvncpw -vncpw irvyrvck
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -restart -agent
 
-      - name: Install Ngrok
-        run: |
-          brew install ngrok
-
-      - name: Start Ngrok TCP VNC Tunnel
+      - name: Install and Start Ngrok
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
+          brew install ngrok
           ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
+          # Using 5900 for VNC
           ngrok tcp 5900 --log=stdout &
-          sleep 10
+          sleep 15
 
-      - name: Keep Mac Alive (Tmate)
+      - name: Wait for Connection
         uses: mxschmitt/action-tmate@v2
         
