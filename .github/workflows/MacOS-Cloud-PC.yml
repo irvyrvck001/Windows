@@ -9,24 +9,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create VNC User
+      - name: Configure VNC Password
         run: |
-          # Create a user named 'runner' with password '1234'
-          sudo dscl . -create /Users/runneruser
-          sudo dscl . -create /Users/runneruser UserShell /bin/bash
-          sudo dscl . -create /Users/runneruser RealName "Runner User"
-          sudo dscl . -create /Users/runneruser UniqueID 501
-          sudo dscl . -create /Users/runneruser PrimaryGroupID 20
-          sudo dscl . -create /Users/runneruser NFSHomeDirectory /Users/runneruser
-          sudo dscl . -passwd /Users/runneruser 1234
-          sudo dscl . -append /Groups/admin GroupMembership runneruser
-
-      - name: Force Enable VNC
-        run: |
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -allowAccessFor -allUsers -privs -all
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -clientopts -setvnclegacy -vnclegacy yes
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -clientopts -setvncpw -vncpw irvyrvck
+          # Set VNC password to 'irvyrvck' for the current session
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -clientopts -setvncpw -vncpw irvyrvck
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -restart -agent
+          echo "VNC Server is configured."
 
       - name: Install and Start Ngrok
         env:
@@ -34,10 +22,14 @@ jobs:
         run: |
           brew install ngrok
           ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
-          # Using 5900 for VNC
+          # This starts the tunnel and prints the address to the log
           ngrok tcp 5900 --log=stdout &
-          sleep 15
+          sleep 10
 
-      - name: Wait for Connection
-        uses: mxschmitt/action-tmate@v2
+      - name: Reveal Ngrok Address
+        run: |
+          curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+
+      - name: Keep Alive
+        uses: mxschmitt/action-tmate@v3
         
